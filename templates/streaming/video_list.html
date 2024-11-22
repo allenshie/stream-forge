@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">影片列表</h5>
+        <a href="{% url 'register_video' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 註冊新影片
+        </a>
+    </div>
+    <div class="card-body">
+        {% if videos %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>影片名稱</th>
+                            <th>檔案路徑</th>
+                            <th>串流網址</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for video in videos %}
+                        <tr>
+                            <td>{{ video.name }}</td>
+                            <td>{{ video.file_path }}</td>
+                            <td>
+                                <div class="input-group">
+                                    <input type="text" class="form-control form-control-sm" 
+                                           value="{{ video.rtsp_url }}" readonly>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button"
+                                            onclick="navigator.clipboard.writeText('{{ video.rtsp_url }}')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge {% if video.status == 'PLAYING' %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ video.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <form action="{% url 'control_video' video.id %}" method="post" 
+                                      style="display: inline;">
+                                    {% csrf_token %}
+                                    {% if video.status == 'PLAYING' %}
+                                        <button type="submit" name="action" value="stop" 
+                                                class="btn btn-warning btn-sm">
+                                            <i class="fas fa-stop"></i> 停止
+                                        </button>
+                                    {% else %}
+                                        <button type="submit" name="action" value="play" 
+                                                class="btn btn-success btn-sm">
+                                            <i class="fas fa-play"></i> 播放
+                                        </button>
+                                    {% endif %}
+                                    <button type="submit" name="action" value="delete" 
+                                            class="btn btn-danger btn-sm"
+                                            onclick="return confirm('確定要刪除此影片嗎？')">
+                                        <i class="fas fa-trash"></i> 刪除
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center text-muted">
+                <p>目前沒有已註冊的影片</p>
+                <a href="{% url 'register_video' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 註冊新影片
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
