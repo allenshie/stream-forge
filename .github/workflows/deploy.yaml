@@ -14,74 +14,65 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. 設置 Python 環境
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # 2. 安裝 SSH 私鑰
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          python-version: '3.9'
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      # 3. 安裝依賴
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # 4. 運行測試
-      - name: Run Tests
-        run: |
-          pytest --maxfail=1 --disable-warnings -q
-        continue-on-error: false  # 如果測試失敗，工作流程停止
-
-      # 5. 部署到 EC2
+      # 3. 部署應用
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           set -e
-          # 備份現有代碼
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           mv ~/django_project ~/django_project_backup_$TIMESTAMP || true
 
-          # 克隆新代碼
           git clone git@github.com:allenshie/stream-forge.git ~/django_project
-
-          # 激活虛擬環境並安裝依賴
           cd ~/django_project
-          source venv/bin/activate || python3 -m venv venv && source venv/bin/activate
+
+          python3 -m venv venv
+          source venv/bin/activate
           pip install -r requirements.txt
 
-          # 遷移數據庫
           python manage.py migrate
-
-          # 收集靜態文件
           python manage.py collectstatic --noinput
 
-          # 重啟服務
           sudo systemctl restart gunicorn
           EOF
 
-      # 6. 檢查部署是否成功
+      # 4. 測試應用程序
+      - name: Run Tests
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+          set -e
+          cd ~/django_project
+          source venv/bin/activate
+
+          # 運行測試
+          pytest --maxfail=1 --disable-warnings -q
+          EOF
+
+      # 5. 驗證部署
       - name: Verify Deployment
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://3.85.107.224)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_PUBLIC_IP }})
           if [ "$RESPONSE" -ne 200 ]; then
             echo "Deployment verification failed with response code: $RESPONSE"
             exit 1
           fi
-        continue-on-error: false
 
-      # 7. 回滾機制
+      # 6. 回滾機制
       - name: Rollback if Deployment Fails
         if: failure()
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           set -e
-          # 找到最新的備份目錄
           LATEST_BACKUP=$(ls -td ~/django_project_backup_* | head -n 1)
           if [ -d "$LATEST_BACKUP" ]; then
             rm -rf ~/django_project
             mv $LATEST_BACKUP ~/django_project
 
-            # 重啟服務
             sudo systemctl restart gunicorn
           else
             echo "No backup found for rollback!"
