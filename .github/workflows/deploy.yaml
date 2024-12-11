@@ -28,7 +28,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           mv ~/django_project ~/django_project_backup_$TIMESTAMP || true
 
-          git clone git@github.com:allenshie/stream-forge.git ~/django_project
+          git clone https://github.com/allenshie/stream-forge.git ~/django_project
           cd ~/django_project
 
           python3 -m venv venv
