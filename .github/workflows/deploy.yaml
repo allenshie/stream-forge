@@ -25,14 +25,17 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           set -e
+          # Conda 初始化
+          source ~/.bashrc
+          conda activate myenv
+
+          # 部署應用
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           mv ~/django_project ~/django_project_backup_$TIMESTAMP || true
 
           git clone https://github.com/allenshie/stream-forge.git ~/django_project
           cd ~/django_project
 
-          python3 -m venv venv
-          source venv/bin/activate
           pip install -r requirements.txt
 
           python manage.py migrate
